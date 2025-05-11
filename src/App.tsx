@@ -128,8 +128,10 @@ function App() {
     a.download = `NF${nfeInfo.numero}_${nfeInfo.destinatario}.xml`;
     document.body.appendChild(a);
     a.click();
-    window.URL.revokeObjectURL(url);
-    document.body.removeChild(a);
+    setTimeout(() => {
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    }, 200);
   };
 
   const handleReload = () => {

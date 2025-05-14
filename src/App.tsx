@@ -93,8 +93,13 @@ function App() {
     // Criar uma cópia do XML original
     const modifiedXml = { ...xmlData };
     
+    // Garantir que det seja um array
+    const det = Array.isArray(modifiedXml.nfeProc.NFe.infNFe.det)
+      ? modifiedXml.nfeProc.NFe.infNFe.det
+      : [modifiedXml.nfeProc.NFe.infNFe.det];
+    
     // Atualizar os produtos no XML com os valores editados
-    modifiedXml.nfeProc.NFe.infNFe.det = modifiedXml.nfeProc.NFe.infNFe.det.map((item: any, index: number) => {
+    modifiedXml.nfeProc.NFe.infNFe.det = det.map((item: any, index: number) => {
       const product = editedProducts[index];
       return {
         ...item,

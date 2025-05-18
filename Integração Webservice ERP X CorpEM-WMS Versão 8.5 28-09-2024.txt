@@ -1,0 +1,2343 @@
+Integração via API (ERP X CorpEM/WMS)
+Detalhes técnicos:
+Integração via Webservice
+
+ Padrão: REST
+ Método: POST
+ Envio/recebimento de dados através de JSON
+ Codiﬁcação Conteúdo: UTF8 decode e Unicode “unescaped”
+*PROGRAMAR E PROVEDOR DO ENDPOINT (WEBSERVICE) É SEMPRE O RECEBEDOR DO FLUXO DAS
+INFORMAÇÕES*
+
+Processos de integração:
+01 - Integração Cadastro de Mercadorias (Fluxo das informações: ERP => WMS (Endpoint no WMS))
+02 - Integração NF de Entrada (DP de entrada) (Fluxo das informações: ERP => WMS (Endpoint no WMS))
+03 - Integração Termo de Falta Avaria do Recebimento (Fluxo das informações: WMS => ERP (Endpoint no ERP))
+04 - Integração de Pedido de Saída (DP Saída) (Fluxo das informações: ERP => WMS (Endpoint no WMS))
+05 - Integração da Conﬁrmação de Separação (Fluxo das informações: WMS => ERP (Endpoint no ERP))
+06 - Integração da Nota Fiscal de Saída (Fluxo das informações: ERP => WMS (Endpoint no WMS))
+07 – Consulta de Estoque (Fluxo das informações: WMS => ERP (Endpoint no WMS))
+08 – Integração Cancelamento do Pedido (Fluxo das informações: ERP => WMS (Endpoint no WMS))
+09 – Integração Conﬁrmação de Embarque (Fluxo das informações: WMS => ERP (Endpoint no ERP))
+10 – Integração Bloqueios e Desbloqueios de Estoque (Fluxo das informações: WMS => ERP (Endpoint no ERP))
+11 – Integração Status do Pedido de Saída no WMS (Fluxo das informações: WMS => ERP (Endpoint no ERP))
+12 – Consulta Status de UM Pedido de Saída no WMS (Fluxo das informações: WMS => ERP (Endpoint no WMS))
+13 - Integração Alterar Prioridade do Pedido de Saída (Fluxo das informações: ERP => WMS (Endpoint no WMS))
+14 – Integração NF Retorno Armazenagem Saída (Fluxo das informações: WMS => ERP (Endpoint no ERP))
+
+Observação:
+1 - Se o valor da tag for nulo ou vazio o conteúdo da tag deve ser preenchido com “”, duas aspas duplas, não informar o
+texto null ou nulo.
+2 - No JSON manter as tags na mesma sequência prevista na documentação, não omi r ou suprimir tags.
+3 - Para cada WEBSERVICE consumir um resquest por vez, nunca paralelizar as requisições.
+4 - Após implantação da integração não é possível fazer processos manuais, por isso todas as movimentações precisam
+ser feitas via WEBSERVICE.
+IMPORTANTE:
+Recomendamos fortemente que seja adotado como PADRÃO uso do Token de Auten cação para os acessos aos
+webservices do WMS, visando ampliar a segurança transacional e conﬁabilidade na iden ﬁcação do Cliente que está
+efe vamente consumindo o webservice em questão.
+Lista dos webservices afetados:
+. Mercadoria (CORPEM_ERP_MERC)
+. Documento Entrada (CORPEM_ERP_DOC_ENT)
+. Inclusão Pedido (CORPEM_ERP_DOC_SAI)
+. Conﬁrmação N.F. (CORPEM_ERP_CONF_NF)
+. Cancelamento Pedido (CORPEM_ERP_CANC_PED)
+. Consulta Estoque (CORPEM_ERP_ESTOQUE)
+Metodologia: No header do request deverá ser inserido termo TOKEN_CP: XXXXXX sendo TOKEN_CP: constante e em
+seguida o Token gerado pelo sistema (Tela WFD) para o respec vo cliente.
+Exemplo Token: TOKEN_CP: X12X4X58S4D5sde57A4d347pqW6rTZ
+Exemplo Responses Erros possíveis:
+{ "CORPEM_WS_ERRO": "Token não informado" }
+{ "CORPEM_WS_ERRO": "Token inválido" }
+Data: 28/09/2024 - Empresa: CorpEM Sistemas -
+
+www.corpem.com.br -
+
+Versão do Documento: 8.5
+
+1/24
+
+01 - Integração Cadastro de Mercadorias
+Fluxo de dados:
+Sen do: ERP para CorpEM (WMS)
+Esse endpoint deve ser u lizado apenas para inclusão de novos cadastros de mercadoria, porém pode ser u lizado para
+enviar alteração do Grupo (CODGRU e NOMEGRU), Fabricante (CODFAB e NOMEFAB).
+
+Dicionário de Dados:
+Produtos
+Campo
+
+Tipo
+
+Valores Descrição
+
+CGCCLIWMS
+
+NUMBER(14)
+
+CODPROD
+NOMEPROD
+IWS_ERP
+
+VARCHAR2(30)
+VARCHAR2(100)
+CHAR(1)
+1
+
+TPOLRET
+
+CHAR(1)
+
+IAUTODTVEN
+
+CHAR(1)
+
+QTDDPZOVEN
+
+CHAR(6)
+
+ILOTFAB
+
+CHAR(1)
+
+1 ou 0
+
+IDTFAB
+
+CHAR(1)
+
+1 ou 0
+
+IDTVEN
+
+CHAR(1)
+
+1 ou 0
+
+INSER
+
+CHAR(1)
+
+1 ou 0
+
+SEM_LOTE_CKO
+
+CHAR(1)
+
+1 ou 0
+
+SEM_DTVEN_CKO
+CODFAB
+NOMEFAB
+CODGRU
+NOMEGRU
+CODPROD_FORN
+
+CHAR(1)
+1 ou 0
+VARCHAR2(20)
+VARCHAR2(100)
+VARCHAR2(20)
+VARCHAR2(100)
+VARCHAR2(60)
+
+NCM
+
+VARCHAR2(8)
+
+1 ou 0
+
+CNPJ do cliente WMS. Sem máscara
+Código da Mercadoria (que será u lizado para iden ﬁcar os produtos nas integrações)
+Código de fábrica + Descrição da mercadoria
+(Preenchimento OPCIONAL) Indicador WMS/ERP
+Polí ca de re rada da mercadoria, FIFO = 0 ou 1, Lote Fabr. = 2,
+Dt. Fabr. = 3, Dt. Venc. = 4, Nº. Série = 5, Pals. cheios + Frac. = 6
+(Preenchimento OPCIONAL)
+Calcular Data de vencimento automa camente (0 = Não / 1 = Sim)
+(Preenchimento OPCIONAL)
+Quan dade de dias para data de vencimento automá ca
+(Preenchimento OPCIONAL)
+Indica se irá controlar lote no produto ( 1 = Sim)
+(Preenchimento OPCIONAL)
+Indica se irá controlar data de fabricação no produto ( 1 = Sim)
+(Preenchimento OPCIONAL)
+Indica se irá controlar data de vencimento do produto ( 1 = Sim)
+(Preenchimento OPCIONAL)
+Indica se irá controlar número de série do produto ( 1 = Sim)
+(Preenchimento OPCIONAL)
+Indica se irá Ignorar Lote no Checkout ( 1 = Sim)
+(Preenchimento OPCIONAL)
+Indica se irá Ignorar Data Vencimento no Checkout ( 1 = Sim)
+(Preenchimento OPCIONAL) Código do Fabricante
+(Preenchimento OPCIONAL) Nome do Fabricante
+(Preenchimento OPCIONAL) Código do Grupo
+(Preenchimento OPCIONAL) Nome do Grupo
+(Preenchimento OPCIONAL) Código da mercadoria no Fornecedor
+(Preenchimento OPCIONAL)
+Classiﬁcação Fiscal/NCM da Mercadoria. SEMPRE com 8 dígitos.
+Sem pontos ou traços ou barras.
+
+Embalagens
+Campo
+
+Tipo
+
+Valores Descrição
+
+CODUNID
+
+VARCHAR2(20)
+
+Embalagem (Ex: UN - unidade, PC - Peça, CX - Caixa.)
+
+FATOR
+CODBARRA
+PESOLIQ
+PESOBRU
+
+NUMBER(8)
+VARCHAR2(30)
+NUMBER(10,3)
+NUMBER(10,3)
+
+ALT
+
+NUMBER
+
+LAR
+
+NUMBER
+
+Quan dade da mercadoria na embalagem
+Código de barras
+(Preenchimento OPCIONAL) Peso Líquido
+(Preenchimento OPCIONAL) Peso Bruto
+(Preenchimento OPCIONAL) Altura, medido em Metro com
+vírgula. Ex.: 0,000
+(Preenchimento OPCIONAL) Largura, medido em Metro com
+vírgula. Ex.: 0,000
+
+Data: 28/09/2024 - Empresa: CorpEM Sistemas -
+
+www.corpem.com.br -
+
+Versão do Documento: 8.5
+
+2/24
+
+COMP
+
+NUMBER
+
+VOL
+
+NUMBER
+
+IEMB_ENT
+
+VARCHAR2(10)
+
+1 ou 0
+
+IEMB_SAI
+
+VARCHAR2(10)
+
+1 ou 0
+
+(Preenchimento OPCIONAL) Comprimento, medido em Metro com
+vírgula.
+(Preenchimento OPCIONAL) Volumetria / Cubagem, medido em
+Metro com vírgula.
+Ex.: 0,0000
+(Preenchimento OPCIONAL)
+Indica se é embalagem padrão de entrada ( 1 = Sim)
+(Preenchimento OPCIONAL)
+Indica se é embalagem padrão de saída ( 1 = Sim)
+
+Exemplo JSON (Mercadoria):
+
+"CORPEM_ERP_MERC":
+{
+"CGCCLIWMS": "00000002000000",
+"PRODUTOS":
+[
+{
+"CODPROD": "1003",
+"NOMEPROD": "SORO FISIOLOGICO 0,9% 250ML FR -alterado- EUROFARMA",
+"IWS_ERP": "1",
+"TPOLRET": "1",
+"IAUTODTVEN": "0",
+"QTDDPZOVEN": "",
+"ILOTFAB": "0",
+"IDTFAB": "0",
+"IDTVEN": "0",
+"INSER": "0",
+"SEM_LOTE_CKO": "0",
+"SEM_DTVEN_CKO": "0",
+"CODFAB": "3",
+"NOMEFAB": "Fabricante 3",
+"CODGRU":"grt3",
+"NOMEGRU":"grupo teste3",
+"EMBALAGENS":
+[
+{
+"CODUNID": "FR",
+"FATOR": "1",
+"CODBARRA": "7898919447428",
+"PESOLIQ": "2",
+"PESOBRU": "6",
+"ALT": "2",
+"LAR": "2",
+"COMP": "2",
+"VOL": ""
+}
+]
+}
+]
+}
+}
+
+Response:
+Mensagem OK: “CORPEM_WS_OK": "OK"”
+"CORPEM_WS_ERRO": “Muitas embalagens (loop)”
+"CORPEM_WS_ERRO": "Nome Mercadoria não informado. Cód. Merc.: 1003"
+"CORPEM_WS_ERRO": “078 - Nenhuma Embalagem informada”
+"CORPEM_WS_ERRO": “077 - Nenhuma Mercadoria informada”
+"CORPEM_WS_ERRO": "CNPJ não possui Cliente Formal WMS: 00123000000100"
+"CORPEM_WS_ERRO": "Web Service não foi iden ﬁcado"
+"CORPEM_WS_ERRO": "Usuário Padrão Web Service não parametrizado - Comunicar Suporte CorpEM"
+"CORPEM_WS_ERRO": "999 - Não foi possível realizar a operação (WS Corpem)" ERRO NÃO CATALOGADO ESTRUTURA
+OU CONTEÚDO DO JSON
+
+Exemplo Response:
+{"CORPEM_WS_OK": "OK"}
+
+Exemplo Response com Erro:
+{"CORPEM_WS_ERRO": "Tag EMBALAGENS não informada. Cód. Merc.: 1004"}
+
+Data: 28/09/2024 - Empresa: CorpEM Sistemas -
+
+www.corpem.com.br -
+
+Versão do Documento: 8.5
+
+3/24
+
+Observação: Por questão de manutenção de boa performance o ideal é que não seja enviado array com mais
+de 2.000 mercadorias de uma só vez.
+
+02 - Integração NF de Entrada (DP de Entrada)
+Fluxo de dados:
+Sen do: ERP para CorpEM (WMS)
+Dicionário de Dados:
+Cabeçalho
+Campo
+
+Tipo
+
+Valores Descrição
+
+CGCCLIWMS
+CGCREM
+
+VARCHAR2(14)
+VARCHAR2(14)
+
+OBSRESDP
+
+VARCHAR2(100)
+
+TPDESTNF
+
+CHAR(1)
+
+DEV
+NUMNF
+SERIENF
+DTEMINF
+VLTOTALNF
+NUMEPEDCLI
+CHAVENF
+CHAVENF_DEV
+
+CHAR(1)
+NUMBER(9)
+VARCHAR2(3)
+DATE
+NUMBER(11,2)
+VARCHAR2(50)
+VARCHAR2(44)
+VARCHAR2(44)
+
+CNPJ do cliente WMS. Sem máscara
+CGC Remetente. Sem máscara
+Observação resumida do DP (Nome Fornecedor + CGC Remetente)
+Ver detalhamento no tópico abaixo (Informações adicionais
+1,2 ou 3 do Tipo Des natário N.F)
+Indica se a nota ﬁscal é de devolução ou não (0 =NOTA
+0 ou 1
+NORMAL Entrada, 1 =NOTA DE DEVOLUÇÃO)
+Número da nota ﬁscal
+Série da nota ﬁscal
+Data de emissão da Nota ﬁscal.
+(dd/mm/aaaa)
+Valor total da nota ﬁscal
+Número do pedido (deve ser único)
+Chave da nota ﬁscal eletrônica de Entrada no CD.
+Chave da nota ﬁscal eletrônica de venda devolvida.
+
+Campo
+
+Tipo
+
+Valores Descrição
+
+NUMSEQ
+CODPROD
+QTPROD
+VLTOTPROD
+NUMPED_COMPRA
+LOTFAB
+DTVEN
+
+NUMBER(6)
+VARCHAR2(30)
+NUMBER(9)
+NUMBER(8,2)
+VARCHAR2(50)
+VARCHAR2(100)
+DATE
+
+NUMSEQ_DEV
+
+NUMBER(6)
+
+Itens
+Número de sequência no item da nota ﬁscal
+Código do produto
+Quan dade do produto
+Valor total do produto (item da nota ﬁscal)
+(Preenchimento OPCIONAL) Número do Pedido de Compra
+(Preenchimento OPCIONAL) Lote Fabricação
+(Preenchimento OPCIONAL) Data de Vencimento/Validade
+(Preenchimento OPCIONAL) Número de sequência no item
+da nota ﬁscal de devolução.
+
+Informações adicionais do Tipo Des natário N.F
+
+Tipo Des natário N.F.
+. Os campos "Tipo Dest. N.F." e "CNPJ Remetente N.F." são opcionais.
+. Se informados, o sistema não permi rá mais de 1 N.F. com os mesmos "CNPJ Emitente" / "No. N.F." / "Série".
+. O "CNPJ Remetente N.F." poderá estar ou não cadastrado.
+Armazém - (1)
+. A N.F. é des nada ao Armazém e emi da pelo Cliente WMS.
+. O Remetente N.F. é o Cliente WMS.
+. Exemplo: Remessa p/ Armazenagem (apenas Operadores Logís cos).
+Cliente - Normal - (2)
+. A N.F. é des nada ao Cliente WMS e emi da por Teceiros.
+. O Remetente N.F. é o Terceiro.
+. Exemplos: Compras, Transferências e Devoluções emi das por Terceiros.
+Data: 28/09/2024 - Empresa: CorpEM Sistemas -
+
+www.corpem.com.br -
+
+Versão do Documento: 8.5
+
+4/24
+
+Cliente - Entrada - (3)
+. A N.F. é des nada ao Cliente WMS e emi da pelo próprio Cliente WMS.
+. O Remetente N.F. é o Terceiro.
+. Exemplos: N.F. Importação e Devoluções emi das pelo próprio Cliente WMS.
+
+Exemplo JSON (NF de Entrada):
+
+{
+"CORPEM_ERP_DOC_ENT": {
+"CGCCLIWMS": "99999999999999",
+"CGCREM": "94516671000153",
+"OBSRESDP": "N.F.: 459607",
+"TPDESTNF": "2",
+"DEV": "0",
+"NUMNF": "459607",
+"SERIENF": "2",
+"DTEMINF": "17/03/2020",
+"VLTOTALNF": "250",
+"NUMEPEDCLI": "N.F. 459607",
+"CHAVENF": "43190394516671000153550020004596071023377876",
+"CHAVENF_DEV": "43190394516671000153550020004596071023377871",
+"ITENS": [
+{
+"NUMSEQ": "1",
+"CODPROD": "5100",
+"QTPROD": "100",
+"VLTOTPROD": "100",
+"NUMSEQ_DEV": "1"
+},
+{
+"NUMSEQ": "2",
+"CODPROD": "5101",
+"QTPROD": "100",
+"VLTOTPROD": "150",
+"NUMSEQ_DEV": "2"
+}
+]
+}
+}
+
+Response:
+Mensagem OK: “CORPEM_WS_OK": "OK"”
+"CORPEM_WS_ERRO": “Muitas mercadorias (loop)” (Mais de 10.000 Mercadorias)
+"CORPEM_WS_ERRO": “077 - Nenhuma Mercadoria informada”
+"CORPEM_WS_ERRO": "CNPJ não possui Cliente Formal WMS: 00123000000100"
+"CORPEM_WS_ERRO": "Web Service não foi iden ﬁcado"
+"CORPEM_WS_ERRO": "Usuário Padrão Web Service não parametrizado - Comunicar Suporte CorpEM"
+"CORPEM_WS_ERRO": "999 - Não foi possível realizar a operação (WS Corpem)" ERRO NÃO CATALOGADO ESTRUTURA OU
+CONTEÚDO DO JSON
+
+"CORPEM_WS_ERRO": "Campo não informado: Chave NF-e ("CHAVENF")" MEDIANTE PARAMETRIZAÇÃO TELA WCD
+"CORPEM_WS_ERRO": "Campo não informado: CNPJ/CPF Remetente ("CGCREM")" MEDIANTE PARAMETRIZAÇÃO TELA WCD
+"CORPEM_WS_ERRO": "Campo não informado: Número N.F. ("NUMNF")" MEDIANTE PARAMETRIZAÇÃO TELA WCD
+"CORPEM_WS_ERRO": "Campo não informado: Série N.F. ("SERIENF")" MEDIANTE PARAMETRIZAÇÃO TELA WCD
+"CORPEM_WS_ERRO": "Campo não informado: Dt. Emissão N.F. ("DTEMINF")" MEDIANTE PARAMETRIZAÇÃO TELA WCD
+"CORPEM_WS_ERRO": "Campo não informado: Valor Total N.F. ("VLTOTALNF")" MEDIANTE PARAMETRIZAÇÃO TELA WCD
+
+Exemplo Response:
+{"CORPEM_WS_OK": "OK"}
+
+Exemplo Response com erro:
+{"CORPEM_WS_ERRO": "077 - Nenhuma Mercadoria informada"}
+
+Data: 28/09/2024 - Empresa: CorpEM Sistemas -
+
+www.corpem.com.br -
+
+Versão do Documento: 8.5
+
+5/24
+
+03 – Integração TFA do Recebimento NF
+Fluxo de dados:
+Sen do: CorpEM (WMS) para ERP
+Dicionário de Dados:
+Cabeçalho
+Campo
+
+Tipo
+
+CHAVENFE
+NUMNF
+SERIENF
+CGCREM
+
+VARCHAR2(50)
+NUMBER(9)
+VARCHAR2(3)
+VARCHAR2(14)
+
+Valores Descrição
+Chave da nota ﬁscal eletrônica importada na integração "02 Integração NF de Entrada DP de Entrada"
+Número da nota ﬁscal
+Série da nota ﬁscal
+CGC Remetente. Sem máscara
+
+Itens
+Campo
+
+Tipo
+
+NUMSEQ
+CODPROD
+QTPROD
+QTAVARIA
+QTFALTA
+LOTFAB
+DTFAB
+DTVEN
+NSER
+
+NUMBER(6)
+VARCHAR2(30)
+NUMBER(9)
+NUMBER(9)
+NUMBER(9)
+VARCHAR2(100)
+DATE
+DATE
+VARCHAR2(100)
+
+Valores Descrição
+Número do Item informado na tag nItem.
+Exemplo: <det nItem=”1”>
+Código do produto
+Quan dade total do produto
+Quan dade de avarias no recebimento
+Quan dade de faltas no recebimento
+(Preenchimento OPCIONAL) Quan dade lote fabricação
+(Preenchimento OPCIONAL) Quan dade data fabricação
+(Preenchimento OPCIONAL) Quan dade data vencimento
+(Preenchimento OPCIONAL) Quan dade número série
+
+Exemplo JSON (TFA do Recebimento NF):
+
+{
+"CORPEM_WMS_FECHA_DE": {
+"CHAVENFE": "43190394516671000153550020004596081023377806",
+"NUMNF": "1234567",
+"SERIENF": "1",
+"CGCREM": "99999999999999",
+"ITEMS": [
+{
+"NUMSEQ": "1",
+"CODPROD": "5100",
+"QTPROD": "0",
+"QTAVARIA": "0",
+"QTFALTA": "10",
+"LOTFAB": "011949194 *** Falta/Recebimento",
+"DTFAB": "1/1/1970",
+"DTVEN": "1/1/1970"
+},
+{
+"NUMSEQ": "1",
+"CODPROD": "5100",
+"QTPROD": "90",
+"QTAVARIA": "0",
+"QTFALTA": "0",
+"LOTFAB": "lote1",
+"DTFAB": "1/1/2001",
+"DTVEN": "1/1/2020"
+},
+{
+"NUMSEQ": "2",
+"CODPROD": "5101",
+"QTPROD": "80",
+"QTAVARIA": "0",
+"QTFALTA": "0",
+"LOTFAB": "lote3",
+"DTFAB": "2/2/2002",
+"DTVEN": "2/2/2022"
+},
+
+Data: 28/09/2024 - Empresa: CorpEM Sistemas -
+
+www.corpem.com.br -
+
+Versão do Documento: 8.5
+
+6/24
+
+{
+"NUMSEQ": "2",
+"CODPROD": "5101",
+"QTPROD": "0",
+"QTAVARIA": "10",
+"QTFALTA": "0",
+"LOTFAB": "lote2",
+"DTFAB": "2/2/2002",
+"DTVEN": "2/2/2022"
+},
+{
+"NUMSEQ": "2",
+"CODPROD": "5101",
+"QTPROD": "0",
+"QTAVARIA": "0",
+"QTFALTA": "10",
+"LOTFAB": "011949195 *** Falta/Recebimento",
+"DTFAB": "1/1/1970",
+"DTVEN": "1/1/1970"
+}
+]
+}
+}
+
+Response:
+“CORPEM_WS_OK": "OK"”
+"CORPEM_WS_ERRO": “Fechamento Tag XXXXX não encontrado (loop)”
+"CORPEM_WS_ERRO": “Bloqueio Avaria Recebimento" não deﬁnido - favor rever tela WW1 [ERP]”
+"CORPEM_WS_ERRO": “Bloqueio Falta Recebimento" não deﬁnido - favor rever tela WW1 [ERP]”
+"CORPEM_WS_ERRO": “Chave NF-e Recebida não encontrada:”
+"CORPEM_WS_ERRO": “Doca Recebimento Padrão" não deﬁnida - Rever tela LAG [ERP]”
+"CORPEM_WS_ERRO": “D.P. possui mais de 1 Doc. Entrada no ERP. Chave NF-e:”
+"CORPEM_WS_ERRO": “Ítem Doc. Entrada não encontrado. NUMSEQ: 9 - Chave NF-e:”
+"CORPEM_WS_ERRO": “Tag CODPROD não encontrada. NUMSEQ:”
+"CORPEM_WS_ERRO": “CODPROD diverge do Cód. Merc. do Ítem Doc. Entrada. CODPROD: XXXXX - Cód. Merc.: YYYYY
+- Chave NF-e:”
+"CORPEM_WS_ERRO": “Controle Lote Fabr. divergente. Cód Merc.:”
+"CORPEM_WS_ERRO": “Controle Dt. Fabr. divergente. Cód Merc.:”
+"CORPEM_WS_ERRO": “Controle Dt. Venc. divergente. Cód Merc.:”
+"CORPEM_WS_ERRO": “Controle No. Série divergente. Cód Merc.:”
+"CORPEM_WS_ERRO": “Muitas mercadorias (loop)” (Mais de 10.000 Mercadorias)
+"CORPEM_WS_ERRO": “077 - Nenhuma Mercadoria informada”
+"CORPEM_WS_ERRO": "CNPJ não possui Cliente Formal WMS: 00123000000100"
+"CORPEM_WS_ERRO": "Web Service não foi iden ﬁcado"
+"CORPEM_WS_ERRO": "Usuário Padrão Web Service não parametrizado - Comunicar Suporte CorpEM"
+"CORPEM_WS_ERRO": "999 - Não foi possível realizar a operação (WS Corpem)" ERRO NÃO CATALOGADO ESTRUTURA OU
+CONTEÚDO DO JSON
+
+04 - Integração de Pedido de Saída (DP de Saída)
+Fluxo de dados:
+Sen do: ERP para CorpEM (WMS).
+Dicionário de Dados:
+Cabeçalho
+Campo
+
+Tipo
+
+CGCCLIWMS
+CGCEMINF
+
+NUMBER(14)
+NUMBER(14)
+
+OBSPED
+
+VARCHAR2(2000)
+
+Valores Descrição
+CNPJ do cliente WMS (CNPJ do Armazém) Sem máscara
+CNPJ Emitente da nota ﬁscal de venda. Sem máscara
+(Preenchimento OPCIONAL)
+Observação do pedido de saída
+(Não é apresentada no romaneio de separação)
+
+Data: 28/09/2024 - Empresa: CorpEM Sistemas -
+
+www.corpem.com.br -
+
+Versão do Documento: 8.5
+
+7/24
+
+OBSROM
+NUMPEDCLI
+
+VARCHAR2(2000)
+VARCHAR2(50)
+
+ORDER_ID
+
+VARCHAR2(200)
+
+NUMPEDRCA
+VLTOTPED
+
+VARCHAR2(50)
+NUMBER(11,2)
+
+COD_MARKETP
+
+VARCHAR2(200)
+
+IETIQ_MK
+
+VARCHAR2(1)
+
+ORDER_ID_MK
+
+VARCHAR2(200)
+
+ECT_TPSERV
+CGCDEST
+IEDEST
+NOMEDEST
+CEPDEST
+UFDEST
+IBGEMUNDEST
+MUN_DEST
+BAIR_DEST
+LOGR_DEST
+NUM_DEST
+COMP_DEST
+TP_FRETE
+
+VARCHAR2(20)
+VARCHAR2(14)
+VARCHAR2(20)
+VARCHAR2(100)
+CHAR(8)
+VARCHAR2(2)
+VARCHAR2(7)
+VARCHAR2(100)
+VARCHAR2(100)
+VARCHAR2(100)
+VARCHAR2(6)
+VARCHAR2(50)
+CHAR(1)
+
+CODVENDEDOR
+
+VARCHAR2(20)
+
+NOMEVENDEDOR
+
+VARCHAR2(100)
+
+DTINCLUSAOERP
+
+DATE
+
+DTLIBERACAOERP
+
+DATE
+
+DTPREV_ENT_SITE
+
+DATE
+
+EMAILRASTRO
+
+VARCHAR2(200)
+
+DDDRASTRO
+
+VARCHAR2(2)
+
+TELRASTRO
+NUMNF
+SERIENF
+DTEMINF
+VLTOTALNF
+CHAVENF
+CGC_TRP
+UF_TRP
+CDBLQ_CLG
+
+VARCHAR2(50)
+VARCHAR2(200)
+VARCHAR2(200)
+DATE
+NUMBER(11,2)
+VARCHAR2(200)
+VARCHAR2(14)
+VARCHAR2(2)
+VARCHAR2(30)
+
+S ou N
+
+C ou F
+
+(Preenchimento OPCIONAL)
+Observação apresentada no romaneio de separação
+Número do pedido
+(Preenchimento OPCIONAL)
+ORDER ID do Pedido no Vtex
+(Preenchimento OPCIONAL)
+Número pedido RCA
+Valor total do pedido
+(Preenchimento OPCIONAL)
+Código de Iden ﬁcação do Marketplace
+(Preenchimento OPCIONAL)
+Indicador para busca E queta Marketplace (S = Sim ou N = Não)
+(Preenchimento OPCIONAL)
+OrderID do Pedido no Marketplace = Shipment_ID
+(Preenchimento OPCIONAL)
+Nome do Tipo de Serviço dos Correios
+CNPJ Cliente (cliente do pedido). Sem máscara
+Inscrição Estadual do Cliente (Se não ver = ISENTO)
+Nome/Razão Social do cliente
+CEP do endereço de des no
+UF do endereço de des no
+Código do IBGE referente ao município de des no
+Município do endereço de des no
+Bairro do endereço de des no
+Logradouro do endereço de des no
+Número do endereço de des no
+Complemento do endereço de des no
+Tipo do Frete [ CIF | FOB ]
+(Preenchimento OPCIONAL)
+Código do vendedor
+(Preenchimento OPCIONAL)
+Nome do vendedor
+(Preenchimento OPCIONAL)
+Data e hora ( mestamp) da inclusão do pedido no ERP
+(Preenchimento OPCIONAL)
+Data e hora ( mestamp) da liberação do pedido no ERP
+(Preenchimento OPCIONAL)
+Data de previsão de entrega do pedido
+(Preenchimento OPCIONAL)
+Email do cliente (para rastreamento)
+(Preenchimento OPCIONAL)
+DDD do telefone do cliente para o rastreamento de pedidos
+(Preenchimento OPCIONAL)
+Telefone do cliente para rastreamento dos pedidos
+(Preenchimento OPCIONAL) Número da NF
+(Preenchimento OPCIONAL) Número de Série da NF
+(Preenchimento OPCIONAL) Data emissão NF. (dd/mm/aaaa)
+(Preenchimento OPCIONAL) Valor total da NF
+(Preenchimento OPCIONAL) Chave da NF-e
+CNPJ da Transportadora do Pedido. Sem máscara
+UF da Transportadora do Pedido
+(Preenchimento OPCIONAL)
+
+Data: 28/09/2024 - Empresa: CorpEM Sistemas -
+
+www.corpem.com.br -
+
+Versão do Documento: 8.5
+
+8/24
+
+PRIORIDADE
+COD_CARGA
+COD_RASTREIO
+ROTA_TRANSP
+
+VARCHAR2(30)
+VARCHAR2(150)
+VARCHAR2(100)
+VARCHAR2(100)
+
+ETQCLIFILESIZE
+
+VARCHAR2(200)
+
+ETQCLIZPLBASE64
+
+CLOB
+
+Código Mo vo de Bloqueio de Estoque (WCE)
+(Preenchimento OPCIONAL)
+Iden ﬁcação de Prioridade do Pedido de Saída
+(Preenchimento OPCIONAL) Código da Carga
+(Preenchimento OPCIONAL) Código de Rastreio Transportadora
+(Preenchimento OPCIONAL) Rota da Transportadora
+(Preenchimento OPCIONAL) Quan dade de caracteres da tag
+ETQCLIZPLBASE64
+(Preenchimento OPCIONAL)
+Conteúdo do arquivo da E queta do Cliente em base64
+
+Itens
+Campo
+
+Tipo
+
+Descrição
+
+NUMSEQ
+CODPROD
+QTPROD
+LOTFAB
+VLUNIT
+
+NUMBER(6)
+VARCHAR2(30)
+NUMBER(9)
+VARCHAR2(100)
+NUMBER(11,2)
+
+CDBLQ_PROD
+IDPERSO
+TXPERSO
+
+VARCHAR2(30)
+VARCHAR2(100)
+VARCHAR2(200)
+
+Número sequencial do item no pedido
+Código do produto
+Quan dade do item no pedido
+(Preenchimento OPCIONAL) Lote de Fabricação
+(Preenchimento OPCIONAL) Valor Unitário do Produto
+(Preenchimento OPCIONAL)
+Código Mo vo de Bloqueio de Estoque (WCE)
+(Preenchimento OPCIONAL) Iden ﬁcador de Item com Personalização
+(Preenchimento OPCIONAL) Texto da Personalização
+
+Exemplo JSON (Pedido de Saída):
+{
+"CORPEM_ERP_DOC_SAI": {
+"CGCCLIWMS": "35457333000129",
+"CGCEMINF": "35457333000129",
+"OBSPED": "",
+"OBSROM": "",
+"NUMPEDCLI": "DC – 3",
+"ORDER_ID": "189456123",
+"NUMPEDRCA": "",
+"VLTOTPED": "23314.4",
+"COD_MARKETP": "B2W",
+"IETIQ_MK": "N",
+"ORDER_ID_MK": "",
+"ECT_TPSERV": "PAC",
+"CGCDEST": "61391769000172",
+"IEDEST": "0820857789",
+"NOMEDEST": "ARISTON IND. QUIM. E FARM. LTDA",
+"CEPDEST": "55660000",
+"UFDEST": "SP",
+"IBGEMUNDEST": "3550308",
+"MUN_DEST": "São Paulo",
+"BAIR_DEST": "T",
+"LOGR_DEST": "RUA ADHERBAL STRESSER,",
+"NUM_DEST": "84",
+"COMP_DEST": "",
+"TP_FRETE": "C",
+"CODVENDEDOR": "RUDIMAR",
+"NOMEVENDEDOR": "Rudimar (e-Commerce)",
+"DTINCLUSAOERP": "26/03/2020",
+"DTLIBERACAOERP": "26/03/2020",
+"DTPREV_ENT_SITE": "",
+"EMAILRASTRO": "",
+"DDDRASTRO": "",
+"TELRASTRO": "",
+"NUMNF": "",
+"SERIENF": "",
+"DTEMINF": "",
+"VLTOTALNF": "",
+"CHAVENF": "",
+"CGC_TRP": "11111111000199",
+"UF_TRP": "ES",
+"CDBLQ_CLG": "10",
+"PRIORIDADE": "ALTA",
+
+Data: 28/09/2024 - Empresa: CorpEM Sistemas -
+
+www.corpem.com.br -
+
+Versão do Documento: 8.5
+
+9/24
+
+"COD_CARGA": "XYZ3594",
+"COD_RASTREIO": "12999XYZ3594",
+"ROTA_TRANSP": "ROTA 00157",
+"ETQCLIFILESIZE": "",
+"ETQCLIZPLBASE64": "",
+"ITENS": [
+{
+"NUMSEQ": "1",
+"CODPROD": "5100",
+"QTPROD": "10",
+"VLUNIT": "1,00",
+"CDBLQ_PROD": "15"
+},
+{
+"NUMSEQ": "2",
+"CODPROD": "5101",
+"QTPROD": "2",
+"VLUNIT": "1,00",
+"CDBLQ_PROD": "15"
+}
+]
+}
+}
+
+Response:
+“CORPEM_WS_OK": "OK"”
+"CORPEM_WS_ERRO": “Fechamento Tag XXXXX não encontrado (loop)”
+"CORPEM_WS_ERRO": “Muitas mercadorias (loop)” (Mais de 10.000 Mercadorias)
+"CORPEM_WS_ERRO": “077 - Nenhuma Mercadoria informada”
+"CORPEM_WS_ERRO": "CNPJ não possui Cliente Formal WMS: 00123000000100"
+"CORPEM_WS_ERRO": "Web Service não foi iden ﬁcado"
+"CORPEM_WS_ERRO": "Usuário Padrão Web Service não parametrizado - Comunicar Suporte CorpEM"
+"CORPEM_WS_ERRO": "999 - Não foi possível realizar a operação (WS Corpem)" ERRO NÃO CATALOGADO ESTRUTURA OU
+CONTEÚDO DO JSON
+
+. Código Rejeição Documento - WMS
+1. No. NF Inválido
+2. Dt. Emi. Inválida
+3. NF/Ped. Existente
+4. CNPJ Transp. não Informado
+5. No. Pedido não Informado
+6. Merc(s). Rejeitada(s)
+7. No. N.F. não Informado
+8. Série N.F. não Informada
+9. Dt. Emissão não Informada
+A. Vl. N.F. não Informado
+B. CNPJ/CPF Dest. não Informado
+V. R. Social Dest. não Informado
+D. Logradouro não Informado
+E. Município não Informado
+F. UF não Informada
+G. Bairro não Informado
+H. CEP não Informado
+I. Vl. N.F. Inválido
+
+. Código Rejeição Mercadoria - WMS
+0. O item do Pedido pode ser atendido, mas o Documento/Pedido tem alguma rejeição.
+1. Cód. Merc. Inexistente
+2. Qt. Inválida
+3. Saldo Insuﬁciente
+
+Data: 28/09/2024 - Empresa: CorpEM Sistemas -
+
+www.corpem.com.br -
+
+Versão do Documento: 8.5
+
+10/24
+
+Exemplo Response:
+{"CORPEM_WS_OK": "OK"}
+
+Exemplo Response com erro:
+{"CORPEM_WS_ERRO": "077 - Nenhuma Mercadoria informada"}
+
+Exemplo de retorno para pedido rejeitado:
+{
+"CORPEM_WS_OK": "OK",
+"COD_REJ_DOC": "3",
+"ITENS:": [ {
+"NUMSEQ": "1",
+"CODPROD": "1174055",
+"QTPROD": "1",
+"QTPROD_OK": "0",
+"COD_REJ_ITEM": "0"
+}]
+}
+
+05 - Integração da Conﬁrmação de Separação
+Fluxo de dados:
+Sen do: CorpEM (WMS) para ERP
+Dicionário de Dados:
+Cabeçalho
+Campo
+
+Tipo
+
+CGCEMINF
+CGCCLIWMS
+NUMPEDCLI
+ESPECIE
+PESOVOL
+M3VOL
+QTVOL
+CGCTRANSP
+
+NUMBER(14)
+NUMBER(14)
+VARCHAR2(50)
+VARCHAR2(50)
+NUMBER(10,3)
+NUMBER(6)
+NUMBER(6)
+VARCHAR2(14)
+
+DTFIMCHECK
+
+DATE
+
+HRFIMCHECK
+URLRAST
+
+VARCHAR2(08)
+VARCHAR2(200)
+
+Valores
+
+Descrição
+CNPJ do Emissor da NF. Sem máscara
+CNPJ do cliente WMS (CNPJ do Armazém). Sem máscara
+Número do pedido
+Embalagem padrão dos volumes (Ex: Caixa)
+Peso total dos volumes
+Quan dade Metros Cúbicos Total dos volumes
+Quan dade de volumes do pedido
+CNPJ da transportadora. Sem máscara
+Data da ﬁnalização do Checkout do Pedido
+(dd/mm/aaaa)
+Hora da ﬁnalização do Checkout do Pedido
+(HH:MM:SS)
+URL Rastreamento
+
+Itens
+Campo
+
+Tipo
+
+NUMSEQ
+CODPROD
+QTPROD
+QTCONF
+
+NUMBER(6)
+VARCHAR2(30)
+NUMBER(9)
+NUMBER(9)
+
+LOTFAB
+
+VARCHAR2(100)
+
+DTFAB
+DTVEN
+
+DATE
+DATE
+
+Valores
+
+Descrição
+Número sequencial do item no pedido
+Código do produto
+Quan dade do item no pedido
+Quan dade conferida do item do pedido
+(Preenchimento OPCIONAL)
+Lote de Fabricação do produto separado
+(Preenchimento OPCIONAL)
+Data de Fabricação do produto separado
+(Preenchimento OPCIONAL)
+
+Data: 28/09/2024 - Empresa: CorpEM Sistemas -
+
+www.corpem.com.br -
+
+Versão do Documento: 8.5
+
+11/24
+
+CODBARRA
+
+VARCHAR2(14)
+
+NSER
+
+VARCHAR2(100)
+
+Data de Vencimento do produto separado
+Código de Barras da Embalagem
+(Preenchimento OPCIONAL)
+Número de série do produto separado
+
+Exemplo JSON (Conﬁrmação de Separação):
+{
+"CORPEM_WMS_CONF_SEP": {
+"CGCEMINF": "99999999999999",
+"CGCCLIWMS": "99999999999999",
+"NUMPEDCLI": "PED-012345873",
+"ESPECIE": "CAIXA",
+"PESOVOL": "85",
+"M3VOL": "55",
+"QTVOL": "13",
+"CGCTRANSP": "",
+"DTFIMCHECK": "26/03/2020",
+"HRFIMCHECK": "11:53:27",
+"URLRAST": "",
+"ITENS": [
+{
+"NUMSEQ": "1",
+"CODPROD": "5100",
+"QTPROD": "10",
+"QTCONF": "10",
+"NSER": "21BASC05479",
+"LOTFAB": "LAA",
+"DTFAB": "01/01/2020",
+"DTVEN": "01/01/2022",
+"CODBARRA": "7891234123459"
+},
+{
+"NUMSEQ": "2",
+"CODPROD": "5101",
+"QTPROD": "2",
+"QTCONF": "2",
+"LOTFAB": "b",
+"DTFAB": "01/01/2020",
+"DTVEN": "01/01/2030"
+}
+]
+}
+}
+
+Exemplo JSON (Conﬁrmação de Separação SEM campos opcionais):
+{
+"CORPEM_WMS_CONF_SEP": {
+"CGCEMINF": "25146091000107",
+"CGCCLIWMS": "11589160000134",
+"NUMPEDCLI": "1020",
+"ESPECIE": "CX",
+"PESOVOL": "1.5",
+"M3VOL": "5",
+"QTVOL": "2",
+"CGCTRANSP": "",
+"DTFIMCHECK": "25/01/2021",
+"URLRAST": "h p://rastreamento.com.br/10001936291020",
+"ITENS": [
+{
+"NUMSEQ": "1",
+"CODPROD": "117405",
+"QTPROD": "1",
+"QTCONF": "1"
+}
+]
+}
+}
+
+Response:
+“CORPEM_WS_OK": "OK"”
+"CORPEM_WS_ERRO": “Fechamento Tag XXXXX não encontrado (loop)”
+"CORPEM_WS_ERRO": “Pedido/Cliente não encontrado: CNPJ Cliente: 1111111111111 - No. Pedido: 99999999”
+Data: 28/09/2024 - Empresa: CorpEM Sistemas -
+
+www.corpem.com.br -
+
+Versão do Documento: 8.5
+
+12/24
+
+"CORPEM_WS_ERRO": “Qt. Volumes não informada - No. Pedido: 999999”
+"CORPEM_WS_ERRO": “D.P. possui mais de 1 Doc. Entrada no ERP - No. Pedido: 999999”
+"CORPEM_WS_ERRO": “D.P. possui reserva no ERP - No. Pedido: 999999”
+"CORPEM_WS_ERRO": “Ítem Doc. Entrada não encontrado. NUMSEQ: 9 - No. Pedido: 999999”
+"CORPEM_WS_ERRO": “CODPROD diverge do Cód. Merc. do Ítem Doc. Saída. NUMSEQ: 9 - CODPROD: 999999 - Cód.
+Merc.: 999999”
+"CORPEM_WS_ERRO": “Quan dade do Ítem Doc. Entrada divergente. NUMSEQ: 9 - No. Pedido: 999999”
+"CORPEM_WS_ERRO": “Controle Lote Fabr. divergente. Cód Merc.:”
+"CORPEM_WS_ERRO": “Controle Dt. Fabr. divergente. Cód Merc.:”
+"CORPEM_WS_ERRO": “Controle Dt. Venc. divergente. Cód Merc.:”
+"CORPEM_WS_ERRO": “Controle No. Série divergente. Cód Merc.:”
+"CORPEM_WS_ERRO": “Reserva WMS/ERP incompleta. NUMSEQ: 9 - Cód Merc.: 999999 - Lote: XXXX - Dt. Fabr.:
+DD/MM/AA - Dt. Venc.: DD/MM/AA - No. Série: 999999 - Qt. Reserva: 9999 - Qt. Conf.: 9999”
+"CORPEM_WS_ERRO": “Muitas mercadorias (loop)” (Mais de 10.000 Mercadorias)
+"CORPEM_WS_ERRO": “077 - Nenhuma Mercadoria informada”
+"CORPEM_WS_ERRO": “Checkout WMS/ERP incompleto. NUMSEQ: 9”
+
+Exemplo Response:
+{"CORPEM_WS_OK": "OK"}
+
+06 - Integração da Nota Fiscal de Saída
+Fluxo de dados:
+Sen do: ERP para CorpEM (WMS)
+Dicionário de Dados:
+Cabeçalho
+Campo
+
+Tipo
+
+CGCCLIWMS
+CGCEMINF
+NUMPEDCLI
+NUMNF
+SERIENF
+DTEMINF
+VLTOTALNF
+QTVOL
+CHAVENF
+
+NUMBER(14)
+NUMBER(14)
+VARCHAR2(50)
+NUMBER(9)
+VARCHAR2(3)
+DATE
+NUMBER(11,2)
+NUMBER(6)
+VARCHAR2(50)
+
+PROTOCOLONF
+
+VARCHAR2(200)
+
+INFOADNF
+
+VARCHAR2(300)
+
+DANFEFILENAME
+
+VARCHAR2(200)
+
+DANFEFILESIZE
+
+NUMBER
+
+DANFEPDFBASE64
+
+CLOB
+
+BOLFILENAME
+
+VARCHAR2(200)
+
+BOLFILESIZE
+
+NUMBER
+
+BOLPDFBASE64
+
+CLOB
+
+Valores
+
+Data: 28/09/2024 - Empresa: CorpEM Sistemas -
+
+Descrição
+CNPJ Cliente WMS (CNPJ Armazém) Sem máscara
+CNPJ emitente da NF. Sem máscara
+Número do pedido
+Número da nota ﬁscal
+Série da nota ﬁscal
+Data emissão da nota ﬁscal (dd/mm/aaaa)
+Valor total da nota ﬁscal
+Quan dade de volumes
+Chave da Nota ﬁscal eletrônica
+(Preenchimento OPCIONAL)
+Número Data e Hora protocolo de autorização NF-e
+(Preenchimento OPCIONAL)
+Informações Adicionais/Observações NF-e
+(Preenchimento OPCIONAL)
+Nome do arquivo (exemplo: CHAVE_ACESSO_NF.PDF)
+(Preenchimento OPCIONAL)
+Quan dade de caracteres da tag DANFEPDFBASE64
+(Preenchimento OPCIONAL)
+Conteúdo do arquivo PDF do DANFE em base64
+(Preenchimento OPCIONAL)
+Nome do arquivo
+(Preenchimento OPCIONAL)
+Quan dade de caracteres da tag BOLPDFBASE64
+(Preenchimento OPCIONAL)
+Conteúdo do arquivo PDF dos Boletos em base64
+www.corpem.com.br -
+
+Versão do Documento: 8.5
+
+13/24
+
+ETQCLIFILESIZE
+ETQCLIZPLBASE64
+
+VARCHAR2(200)
+CLOB
+
+CGCTRANSP
+ROTA_TRANSP
+COD_RASTREIO
+
+VARCHAR2(14)
+VARCHAR2(100)
+VARCHAR2(100)
+
+NFXMLFILESIZE
+
+VARCHAR2(200)
+
+NFXMLBASE64
+
+CLOB
+
+(Preenchimento OPCIONAL)
+Quan dade de caracteres da tag ETQCLIZPLBASE64
+(Preenchimento OPCIONAL)
+Conteúdo do arquivo da E queta do Cliente em base64
+(Preenchimento OPCIONAL)
+CNPJ transportadora da NF. Sem máscara
+(Preenchimento OPCIONAL) Rota da Transportadora
+(Preenchimento OPCIONAL)
+Código de Rastreio Transportadora
+(Preenchimento OPCIONAL)
+Quan dade de caracteres da tag NFXMLPLBASE64
+(Preenchimento OPCIONAL)
+Conteúdo do arquivo XML NF-e em base64
+
+Volumes (Incluir a TAG volumes caso sejam informados números dos objetos dos Correios).
+Campo
+
+Tipo
+
+Descrição
+
+NUMVOL
+
+NUMBER(6)
+
+ECT_NUMOBJ
+
+VARCHAR2(50)
+
+Número do Objeto dos Correios
+
+Tipo
+NUMBER(6)
+VARCHAR2(30)
+NUMBER(9)
+
+Descrição
+Número sequencial do item
+Código da mercadoria
+Quan dade
+
+(Preenchimento OPCIONAL)
+
+Iden ﬁcação do Volume
+(Preenchimento OPCIONAL)
+
+Itens
+Campo
+NUMSEQ
+CODPROD
+QTPROD
+
+Exemplo JSON (Nota Fiscal de Saída):
+
+{
+"CORPEM_ERP_CONF_NF": {
+"CGCCLIWMS": "99999999999999",
+"CGCEMINF": "99999999999999",
+"NUMPEDCLI": "DC - 3",
+"NUMNF": "5",
+"SERIENF": "800",
+"DTEMINF": "26/03/2020",
+"VLTOTALNF": "23314.4",
+"QTVOL": "2",
+"CHAVENF": "32200335457333000129558000000000051676298190",
+"PROTOCOLONF": "",
+"INFOADNF: "",
+"DANFEFILENAME": "DANFE_5.PDF",
+"DANFEFILESIZE": "10",
+"DANFEPDFBASE64": "0123456789",
+"BOLFILENAME": "BOLETOS.PDF",
+"BOLFILESIZE": "890",
+"BOLPDFBASE64": "0123456789X151X44X74X",
+"ETQCLIFILESIZE": "",
+"ETQCLIZPLBASE64": "",
+"CGCTRANSP": "11589160000135",
+"ROTA_TRANSP": "",
+"COD_RASTREIO": "",
+"NFXMLFILESIZE": "",
+"NFXMLBASE64": "",
+"ITENS": [
+{
+"NUMSEQ": "1",
+"CODPROD": "5100",
+"QTPROD": "10"
+},
+{
+"NUMSEQ": "2",
+"CODPROD": "5101",
+"QTPROD": "2"
+}
+]
+
+Data: 28/09/2024 - Empresa: CorpEM Sistemas -
+
+www.corpem.com.br -
+
+Versão do Documento: 8.5
+
+14/24
+
+}}
+
+Exemplo JSON (Nota Fiscal de Saída com Objeto Correios)
+{
+"CORPEM_ERP_CONF_NF": {
+"CGCCLIWMS": "11589160000134",
+"CGCEMINF": "11589160000134",
+"NUMPEDCLI": "1020",
+"NUMNF": "5",
+"SERIENF": "1",
+"DTEMINF": "25/01/2021",
+"VLTOTALNF": "23314.4",
+"QTVOL": "2",
+"CHAVENF": "32200335457333000129558000000000051676298191",
+"DANFEFILENAME": "DANFE_5.PDF",
+"DANFEFILESIZE": "10",
+"DANFEPDFBASE64": "0123456789",
+"CGCTRANSP": "11589160000135",
+"VOLUMES": [
+{
+"NUMVOL":"1",
+"ECT_NUMOBJ":"1234567"
+},
+{
+"NUMVOL":"2",
+"ECT_NUMOBJ":"2222222"
+}
+],
+"ITENS": [
+{
+"NUMSEQ": "1",
+"CODPROD": "117405",
+"QTPROD": "2"
+}
+]
+}}
+
+Exemplo JSON com dados da e queta correios
+{
+"CORPEM_ERP_CONF_NF": {
+"CGCCLIWMS": "11589160000134",
+"CGCEMINF": "11589160000134",
+"NUMPEDCLI": "372",
+"NUMNF": "9",
+"SERIENF": "772",
+"DTEMINF": "25/01/2021",
+"VLTOTALNF": "23314.4",
+"QTVOL": "2",
+"CHAVENF": "322003354573330001295580000000000516762981944",
+"DANFEFILENAME": "DANFE_5.PDF",
+"DANFEFILESIZE": "10",
+"DANFEPDFBASE64": "0123456789",
+"CGCTRANSP": "11589160000135",
+"ECT_TPSERV" = " po 1",
+"ECT_NUMCT" = "1234",
+"RZS_ETQ" = "razao e queta",
+"NMLOGO_ETQ" = "nome logo",
+"VOLUMES": [{
+"NUMVOL":"2",
+"ECT_NUMOBJ":"11111111"
+},
+{
+"NUMVOL":"1",
+"ECT_NUMOBJ":"22222222"
+}
+],
+"ITENS": [
+{
+"NUMSEQ": "1",
+"CODPROD": "117405",
+"QTPROD": "2"
+}
+]
+}}
+
+Data: 28/09/2024 - Empresa: CorpEM Sistemas -
+
+www.corpem.com.br -
+
+Versão do Documento: 8.5
+
+15/24
+
+Response:
+“CORPEM_WS_OK": "OK"”
+"CORPEM_WS_ERRO": "Rejeição 1 - Pedido Inexistente"
+"CORPEM_WS_ERRO": "Rejeição 2 - Ped. já possui N.F."
+"CORPEM_WS_ERRO": "Rejeição 3 - N.F. já importada"
+"CORPEM_WS_ERRO": "Rejeição 4 - No. N.F. inválido"
+"CORPEM_WS_ERRO": "Rejeição 5 - Dt. Emi. N.F. inválida"
+"CORPEM_WS_ERRO": "Rejeição 6 - Valor N.F. inválido"
+"CORPEM_WS_ERRO": "Rejeição 7 - Qt. Volumes N.F. inválido"
+"CORPEM_WS_ERRO": "Rejeição 8 - Qt. Volumes N.F. divergente"
+"CORPEM_WS_ERRO": "Rejeição 9 - CNPJ Transp. não informado"
+"CORPEM_WS_ERRO": "Rejeição A - CNPJ Transp. divergente [cnpj_transp]"
+"CORPEM_WS_ERRO": "Rejeição B - Pedido Cancelado"
+"CORPEM_WS_ERRO": "Rejeição C - Pedido Embarcado"
+"CORPEM_WS_ERRO": "Rejeição D - Tamanho L.I.V. não é múl plo de Qt. Volumes"
+"CORPEM_WS_ERRO": "Rejeição E - Tamanho Iden ﬁcação Volume maior que 50"
+"CORPEM_WS_ERRO": "Rejeição F - Chave NF-e não informada"
+"CORPEM_WS_ERRO": "Rejeição G - PDF DANFE não encontrado"
+"CORPEM_WS_ERRO": "Rejeição Z - Outros: [xxx]"
+"CORPEM_WS_ERRO": “Fechamento Tag XXXXX não encontrado (loop)”
+"CORPEM_WS_ERRO": "CNPJ não possui Cliente Formal WMS: 00123000000100"
+"CORPEM_WS_ERRO": "Web Service não foi iden ﬁcado"
+"CORPEM_WS_ERRO": "Usuário Padrão Web Service não parametrizado - Comunicar Suporte CorpEM"
+"CORPEM_WS_ERRO": "999 - Não foi possível realizar a operação (WS Corpem)" ERRO NÃO CATALOGADO ESTRUTURA
+OU CONTEÚDO DO JSON
+
+Exemplo de Response:
+{"CORPEM_WS_OK": "OK"}
+
+Exemplo de Response com erro:
+{"CORPEM_WS_ERRO": "Tag "QTVOL" (2) difere da quantidade de volumes na tag "VOLUMES" (0)"}
+
+07 - Integração de Consulta de Estoque
+ Padrão: REST
+ Método: POST
+ Envio/recebimento de dados através de JSON
+Fluxo de dados:
+Sen do: Requisição do ERP para Consulta ao CorpEM (WMS)
+Campo:
+CGCCLIWMS = CNPJ Cliente WMS (CNPJ Armazém)
+
+Exemplo JSON (Request da Consulta de Estoque TOTAL)
+{ "CORPEM_ERP_ESTOQUE": {"CGCCLIWMS": "10584607000110"}}
+
+Data: 28/09/2024 - Empresa: CorpEM Sistemas -
+
+www.corpem.com.br -
+
+Versão do Documento: 8.5
+
+16/24
+
+Exemplo JSON (Request da Consulta de Estoque INDIVIDUAL)
+{ "CORPEM_ERP_ESTOQUE": {"CGCCLIWMS": "10584607000110", "CODPROD": "002"}}
+
+Dicionário de Dados:
+Campo
+CD
+FT
+QC
+QB
+QF
+QA
+
+Tipo
+VARCHAR(30)
+NUMBER(8)
+NUMBER
+NUMBER
+NUMBER
+NUMBER
+
+Descrição
+Código da mercadoria
+Fator da embalagem
+Quan dade contábil
+Quan dade bloqueada e reservada
+Quan dade falta
+Quan dade bloqueada avulso
+
+As informações são equivalentes ao relatório WQ4 com as colunas abaixo:
+
+Exemplo JSON (Response: Retorno da Consulta de Estoque):
+{"CORPEM_ERP_ESTOQUE": {"PRODUTOS": [
+{
+"CD": "1018259",
+"FT": "1",
+"QC": "1",
+"QB": "0",
+"QF": "0",
+"QA": "0"
+},
+{
+"CD": "1019039",
+"FT": "1",
+"QC": "8",
+"QB": "0",
+"QF": "0",
+"QA": "0"
+},
+{
+"CD": "1019056",
+"FT": "1",
+"QC": "1",
+"QB": "0",
+"QF": "0",
+"QA": "0"
+}
+]}}
+
+FÓRMULA DE CÁLCULO (QC = Quan dade Contábil)
+QC = Qt.Contábil – Qt.DS NF – Qt.Bloqueado
+Observação: As mercadorias presentes nos Documentos de Saída que não veram reserva de estoque, não têm as
+Data: 28/09/2024 - Empresa: CorpEM Sistemas -
+
+www.corpem.com.br -
+
+Versão do Documento: 8.5
+
+17/24
+
+respec vas quan dades descontadas no cálculo do QC.
+
+Observação: Recomendamos que a consulta não seja acionada mais de uma vez em menos de 10 minutos.
+
+08 - Integração Cancelamento do Pedido
+Fluxo de dados:
+Sen do: ERP para CorpEM (WMS)
+Dicionário de Dados:
+Campo
+
+Tipo
+
+CGCCLIWMS
+NUMPEDCLI
+
+NUMBER(14)
+VARCHAR2(50)
+
+Valores Descrição
+CNPJ do cliente WMS. Sem máscara
+Número do pedido
+
+Exemplo JSON (Cancelamento do Pedido):
+{
+"CORPEM_ERP_CANC_PED": {
+"CGCCLIWMS": "35457333000129",
+"NUMPEDCLI": " DC - 3"
+}
+}
+
+Response:
+“CORPEM_WS_OK": "OK"”
+"CORPEM_WS_ERRO": "CNPJ não possui Cliente Formal WMS”
+"CORPEM_WS_ERRO": "Doc. Saída já se encontra Cancelado. No. Seq.: 99999"}
+
+Exemplo de Response:
+{"CORPEM_WS_OK": "OK"}
+
+Exemplo de Response com erro:
+{"CORPEM_WS_ERRO": "Doc. Saída já se encontra Cancelado. No. Seq.: 193629"}
+
+09 - Integração Conﬁrmação de Embarque
+Fluxo de dados:
+Sen do: CorpEM (WMS) para ERP
+Dicionário de Dados:
+Campo
+
+Tipo
+
+CGCEMINF
+CGCCLIWMS
+NUMPEDCLI
+TIPO_EVENTO
+
+NUMBER(14)
+NUMBER(14)
+VARCHAR2(50)
+VARCHAR2(1)
+
+DT_HR_EVENTO
+CGCTRANSP
+NUM_DOC_EMB
+QT_PED_EMB
+
+VARCHAR2(20)
+VARCHAR2(14)
+NUMBER(10)
+VARCHAR(200)
+
+Valores
+
+1 ou 2
+
+Descrição
+CNPJ Emitente da Nota Fiscal de Saída. Sem máscara
+CNPJ do cliente WMS. Sem máscara
+Número do pedido
+1. Conf. Embarque; 2. Canc. Conf. Embarque
+Data/hora do conf. ou Cancelamento do embarque
+(dd/mm/aa hh24:mi:ss)
+CNPJ da transportadora
+Código do Documento de embarque
+Quan dade de Pedidos no Embarque
+
+Exemplo JSON (Conﬁrmação de Embarque do Pedido):
+Data: 28/09/2024 - Empresa: CorpEM Sistemas -
+
+www.corpem.com.br -
+
+Versão do Documento: 8.5
+
+18/24
+
+{
+"CORPEM_WMS_CONF_EMB": {
+"CGCCEMINF": "35457333000129",
+"CGCCLIWMS": "35457333000129",
+"NUMPEDCLI": " DC - 3",
+"TIPO_EVENTO":"1",
+"DT_HR_EVENTO": "11/11/21 11:17:32",
+"CGCTRANSP": "12345678901234",
+"NUM_DOC_EMB": "123",
+"QT_PED_EMB": "60"
+}
+}
+
+Response:
+“CORPEM_WS_OK": "OK"”
+"CORPEM_WS_ERRO": "Pedido/Cliente não encontrado: CNPJ Cliente: 11589160000134 - No. Pedido: XXX"}
+
+Exemplo de Response:
+{"CORPEM_WS_OK": "OK"}
+
+10 - Integração Bloqueios e Desbloqueios de Estoque
+Fluxo de dados:
+Sen do: CorpEM (WMS) para ERP
+Dicionário de Dados:
+Campo
+
+Tipo
+
+CGCCLIWMS
+CODPROD
+
+NUMBER(14)
+VARCHAR2(30)
+
+CODBLOQ
+DTBLOQ
+
+VARCHAR2(30)
+DATE
+
+QTBLOQ
+LOTFAB
+NSER
+DTFAB
+DTVEN
+
+NUMBER(14)
+VARCHAR2(100)
+VARCHAR2(100)
+DATE
+DATE
+
+Valores Descrição
+CNPJ do cliente WMS. Sem máscara
+Código da Mercadoria / SKU
+Código do Mo vo de Bloqueio de Estoque (De Para na tela WCE)
+Código Depósito SAP
+Data do Bloqueio ou Desbloqueio de Estoque (dd/mm/aaaa)
+Quan dade Bloqueada/Desbloqueio
+SE ESTIVER PRESENTE SINAL – SIGNIFICA QUE É UM DESBLOQUEIO
+(Preenchimento OPCIONAL) Lote Fabricação
+(Preenchimento OPCIONAL) Número de Série
+(Preenchimento OPCIONAL) Data de Fabricação (dd/mm/aaaa)
+(Preenchimento OPCIONAL) Data de Vencimento (dd/mm/aaaa)
+
+Exemplo JSON (Bloqueios e Desbloqueios de Estoque):
+{
+
+"CORPEM_WMS_BLOQ_DESBLOQ": {
+"CGCCLIWMS": "00000000000000",
+"ITENS": [
+{
+"CODPROD": "1018259",
+"CODBLOQ": "1",
+"DTBLOQ": "30/03/2022",
+"QTBLOQ": "10"
+},
+{
+"CODPROD": "1018209",
+"CODBLOQ": "10",
+"DTBLOQ": "30/03/2022",
+"QTBLOQ": "-15"
+},
+{
+"CODPROD": "1017259",
+"CODBLOQ": "8",
+"DTBLOQ": "30/03/2022",
+"QTBLOQ": "5"
+}
+
+Data: 28/09/2024 - Empresa: CorpEM Sistemas -
+
+www.corpem.com.br -
+
+Versão do Documento: 8.5
+
+19/24
+
+]
+}
+}
+
+11 - Integração Status do Pedido de Saída no WMS
+Fluxo de dados:
+Sen do: CorpEM (WMS) para ERP
+Dicionário de Dados:
+Campo
+
+Tipo
+
+CGCCLIWMS
+NUMPEDCLI
+
+NUMBER(14)
+VARCHAR2(50)
+
+STATUSPED
+
+VARCHAR2(10)
+
+DESCRSTATUS
+DTHRSTATUS
+
+VARCHAR2(40)
+DATE
+
+Valores Descrição
+CNPJ do cliente WMS. Sem máscara
+Número do Pedido do Cliente
+Código do Status do Pedido de Saída no WMS
+(Veja Tabela “De Para”)
+Descrição do Status do Pedido de Saída
+(Veja Tabela “De Para”)
+Data e Hora do Status do Pedido de Saída
+
+Tabela “De Para” Status do Pedido de Saída:
+Índice Situação WMS
+1
+2
+3
+4
+5
+6
+7
+8
+9
+
+Em Digitação
+A Separar
+Em Separação
+Separação Encerrada
+Em Checkout
+Ckeckout Encerrado
+Separação Conﬁrmada
+N.F. Conﬁrmada
+Embarque Conﬁrmado
+
+Status
+Em Digitação / Pedido recebido
+A Separar / Liberado para Separação
+Em Separação / Separação iniciada
+Separação Encerrada
+Em Checkout / Checkout iniciado
+Checkout Encerrado
+Separação Conﬁrmada / Aguardando emissão de nota
+NF Conﬁrmada / Aguardando coleta
+Embarque Conﬁrmado / Pedido expedido
+
+Código
+00
+05
+10
+11
+12
+13
+15
+20
+25
+
+Momento
+Após Inclusão do Pedido
+Após Liberação para Separação
+Após Início da Separação/Separação do 1º item
+Após Fim da Separação
+Após Início do Checkout/Checkout do 1º item
+Após Fim do Checkout
+Após a Conﬁrmação de Separação
+Após recebimento dos dados da NF Conﬁrmada
+Após o Fechamento do Embarque
+
+Exemplo JSON (Status do Pedido de Saída):
+{
+"CORPEM_WMS_STATUS_PED": {
+"CGCCLIWMS": "11111111000199",
+“PEDIDOS”: [
+{
+"NUMPEDCLI": "A123456",
+"STATUSPED": "25",
+"DESCRSTATUS": "Embarque Conﬁrmado / Pedido expedido",
+"DTHRSTATUS": "2020-11-07T16:45:18:000Z"
+},
+{
+"NUMPEDCLI": "A123457",
+"STATUSPED": "25",
+"DESCRSTATUS": "Embarque Conﬁrmado / Pedido expedido",
+"DTHRSTATUS": "2020-11-07T17:08:18:000Z"
+}
+]
+}
+}
+
+Observações:
+1) Por padrão as Datas/Horas, serão enviados no JSON no formato de string ISO 8601, e o valor do milésimo
+de segundos será constante “000”.
+2) Será enviado um Array de Pedidos, sendo assim serão enviados um ou mais Pedidos que veram alteração
+no Status.
+
+Data: 28/09/2024 - Empresa: CorpEM Sistemas -
+
+www.corpem.com.br -
+
+Versão do Documento: 8.5
+
+20/24
+
+Response:
+Mensagem OK: “CORPEM_WS_OK”:”OK”
+Mensagem erro: “999 - Não foi possível receber a informação”
+
+Ciclo do Pedido de Saída
+
+1º) Envio de interface (00):
+Pedido de Saída: 123456
+Código status: 00
+Descrição status: Em Digitação / Pedido recebido
+Data/hora: 01/01/2020 11:00
+2º) Envio de interface (05):
+Pedido de Saída: 123456
+Código status: 05
+Descrição status: A Separar / Liberado para Separação
+Data/hora: 01/01/2020 11:15
+3º) Envio de interface (10):
+Pedido de Saída: 123456
+Código status: 10
+Descrição status: Em Separação / Separação iniciada
+Data/hora: 01/01/2020 11:50
+Observação: Depende do uso do Coletor de dados
+4º) Envio de interface (15):
+Pedido de Saída: 123456
+Código status: 15
+Descrição status: Separação Conﬁrmada / Aguardando emissão de nota
+Data/hora: 01/10/2020 11:55
+5º) Envio de interface (20):
+Pedido de Saída: 123456
+Código status: 20
+Descrição status: NF Conﬁrmada / Aguardando coleta
+Data/hora: 01/01/2020 12:00
+Observação: Depende do envio da Conﬁrmação da NF (EDI ou webservice)
+6º) Envio de interface (25):
+Pedido de Saída: 123456
+Código status: 25
+Descrição status: Embarque Conﬁrmado / Pedido expedido
+Data/hora: 01/01/2020 14:00
+Observação: Recomendável que o cliente u lize a integração dos Pedidos e Conﬁrmação da NF Emi da via webservice.
+
+12 - Integração Consulta Status do UM Pedido de Saída no WMS
+Fluxo de dados:
+Sen do: CorpEM (WMS) para ERP
+Dicionário de Dados:
+Campo
+
+Tipo
+
+CGCCLIWMS
+NUMPEDCLI
+
+NUMBER(14)
+VARCHAR2(50)
+
+Valores Descrição
+CNPJ do cliente WMS. Sem máscara
+Número do Pedido do Cliente
+
+Data: 28/09/2024 - Empresa: CorpEM Sistemas -
+
+www.corpem.com.br -
+
+Versão do Documento: 8.5
+
+21/24
+
+Exemplo JSON (Request Status de UM Pedido de Saída no WMS):
+{
+"CORPEM_ERP_STATUS_PED": {
+"CGCCLIWMS": "35457000000129",
+"NUMPEDCLI": "1756506"
+}
+}
+
+Response:
+{
+
+"CORPEM_WMS_CONSULTA_STATUS_PED":
+{
+"CGCCLIWMS": "35457000000129",
+"NUMPEDCLI": "1756506",
+"STATUSPED": "15",
+"DESCRSTATUS": "Separação Conﬁrmada",
+"DTHRSTATUS": "2022-04-20T17:50:32.000Z"
+}
+}
+
+13 - Integração Alterar Prioridade do Pedido de Saída
+Fluxo de dados:
+Sen do: ERP para CorpEM (WMS)
+Dicionário de Dados:
+Campo
+
+Tipo
+
+Valores Descrição
+
+CGCCLIWMS
+
+NUMBER(14)
+
+CNPJ do cliente WMS. Sem máscara
+
+NUMPEDCLI
+PRIORIDADE
+
+VARCHAR2(50)
+VARCHAR2(30)
+
+Número do pedido do Cliente
+Iden ﬁcação de Prioridade do Pedido de Saída
+
+Exemplo JSON (Request):
+{
+"CORPEM_ERP_ALT_PED": {
+"CGCCLIWMS":"35457333000129",
+"NUMPEDCLI": "12345X13",
+"PRIORIDADE":"ALTA"
+}
+}
+
+Response:
+“CORPEM_WS_OK”:”OK”
+"CORPEM_WS_ERRO": “CNPJ não possui Cliente Formal WMS: xxxx”
+"CORPEM_WS_ERRO": “CNPJ possui mais de 1 Cliente Formal WMS: xxxx”
+"CORPEM_WS_ERRO": “Pedido não encontrado: xxxx”
+"CORPEM_WS_ERRO": “Pedido xxxx já possui Separação Iniciada”
+
+Data: 28/09/2024 - Empresa: CorpEM Sistemas -
+
+www.corpem.com.br -
+
+Versão do Documento: 8.5
+
+22/24
+
+14 - Integração NF Retorno Armazenagem Saída
+Fluxo de dados:
+Sen do: CorpEM (WMS) para ERP
+Dicionário de Dados:
+Campo
+
+Tipo
+
+Descrição
+
+CGCCLIWMS
+CHAVENFE
+NF
+SERIE
+
+NUMBER(14)
+VARCHAR2(44)
+VARCHAR2(09)
+VARCHAR2(03)
+
+DTEMI
+VLTOT
+SERIE
+NUMPED
+
+DATE
+NUMBER(11.2)
+VARCHAR2(03)
+VARCHAR2(30)
+
+CNPJ do cliente WMS. Sem máscara
+Número da Chave de Acesso NF-e de Retorno de Armazenagem Saída
+Número NF de Retorno de Armazenagem Saída
+Série NF de Retorno de Armazenagem Saída
+Data de Emissão da NF de Retorno de Armazenagem Saída
+(dd/mm/aaaa)
+Valor Total da NF de Retorno de Armazenagem Saída
+Série NF de Retorno de Armazenagem Saída
+Número do Pedido de Saída
+
+Itens
+Campo
+
+Tipo
+
+Descrição
+
+NUMSEQ
+CODPROD
+QTPROD
+NFORIG
+SERIORI
+
+NUMBER(03)
+VARCHAR2(30)
+NUMBER(9)
+VARCHAR2(09)
+VARCHAR2(03)
+
+ITEMORI
+
+VARCHAR2(03)
+
+Número sequencial do Item na NF de Retorno de Armazenagem Saída
+Código da mercadoria
+Quan dade da Mercadoria
+NF de Origem (NF Remessa para Armazenagem Entrada)
+Série NF de Origem (NF Remessa para Armazenagem Entrada)
+Número sequencial do Item na NF de Origem (NF Remessa para Armazenagem
+Entrada)
+
+Exemplo JSON (Request):
+{
+
+"CORPEM_WMS_DEV_REM": {
+"CGCCLIWMS": "00000000000142",
+"CHAVENFE": "32240000000000000800550020000000000000000289",
+"NF": "000000160",
+"SERIE": "2",
+"DTEMI": "11/11/2023",
+"VLTOT": "1234.56"
+"NUMPED": "018236",
+"ITEMS": [
+{
+"NUMSEQ": "1",
+"CODPROD": "43114",
+"QTPROD": "10",
+"NFORIG": "102030",
+"SERIORI": "2",
+"ITEMORI": "01"
+},
+{
+"NUMSEQ": "2",
+"CODPROD": "43114",
+"QTPROD": "12",
+"NFORIG": "102020",
+"SERIORI": "2",
+"ITEMORI": "03"
+},
+{
+"NUMSEQ": "3",
+"CODPROD": "43114",
+"QTPROD": "2",
+"NFORIG": "101020",
+
+Data: 28/09/2024 - Empresa: CorpEM Sistemas -
+
+www.corpem.com.br -
+
+Versão do Documento: 8.5
+
+23/24
+
+"SERIORI": "2",
+"ITEMORI": "05"
+}
+]
+}
+}
+
+Observação: Somente deve conter um Doc.Saída/Pedido por NF de Retorno.
+
+Response:
+“CORPEM_WS_OK”:”OK”
+
+Todas as informações con das neste documento são de propriedade exclusiva da CorpEM Sistemas Ltda. e seu uso é
+regulado pela Lei 9.610/98 - Lei dos Direitos Autorais e pelo Contrato de Prestação de Serviços ﬁrmado entre a CorpEM
+Sistemas Ltda. e seus Clientes. É proibido: copiar, reproduzir, traduzir, adaptar, modiﬁcar, alienar, vender, locar, sublocar,
+ceder, ou transferir esta documentação, no todo ou em parte, sem prévia e expressa autorização da CorpEM Sistemas
+Ltda.
+
+OBSERVAÇÃO IMPORTANTE:
+Todos cadastros do sistema CorpEM são de responsabilidade do cliente e deverão ser realizados e
+man dos por tal, cabendo a CorpEM Sistemas Ltda. prestar os esclarecimentos, orientações e
+informações per nentes que lhes forem solicitadas.
+
+Caso haja alguma dúvida favor entrar em contato através dos canais abaixo:
+E-mail: suporte@corpem.com.br
+Telefone: (27) 3024-2888
+Site: www.corpem.com.br
+Dados de Acesso Web service
+WSDL do webservice ambiente de testes:
+http://webcorpem.no-ip.info:37560/scripts/mh.dll/wc
+WSDL do webservice ambiente de Produção:
+http://webcorpem.no-ip.info:800/scripts/mh.dll/wc
+OBS:
+- Para os retornos da confirmação de separação e para o fechamento do DP de entrada (TFAA) devem ser
+informados os caminhos dos webservices onde o CorpEM deverá enviar os dados de retorno.
+- Todos os endpoints utilizam o mesmo "caminho", sendo que o sistema identifica o serviço pelo JSON que é
+enviado, mais precisamente pela TAG inicial:
+Exemplos de JSONs:
+Produtos
+{
+"CORPEM_ERP_MERC": {
+"CGCCLIWMS": "00000000000109",
+Nota fiscal de entrada
+{
+"CORPEM_ERP_DOC_ENT": {
+"CGCCLIWMS": "00000000000109",
+
+Data: 28/09/2024 - Empresa: CorpEM Sistemas -
+
+www.corpem.com.br -
+
+Versão do Documento: 8.5
+
+24/24
+
+

@@ -269,7 +269,7 @@ function App() {
     
     try {
       console.log("Enviando cadastro de produtos com CGCCLIWMS:", formattedCgcClienteWMS, JSON.stringify(productPayload, null, 2));
-      const productResponse = await fetch('/scripts/mh.dll/wc', { // Proxy para http://webcorpem.no-ip.info:37560
+      const productResponse = await fetch('http://webcorpem.no-ip.info:37560/scripts/mh.dll/wc', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json; charset=utf-8',
@@ -303,7 +303,7 @@ function App() {
       const nfEntryPayload = buildNfEntryPayload(formattedCgcClienteWMS, nfeInfo, editedProducts, originalXmlDet);
       console.log("Enviando entrada de NF com CGCCLIWMS:", formattedCgcClienteWMS, JSON.stringify(nfEntryPayload, null, 2));
       
-      const nfEntryResponse = await fetch('/scripts/mh.dll/wc', {
+      const nfEntryResponse = await fetch('http://webcorpem.no-ip.info:37560/scripts/mh.dll/wc', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json; charset=utf-8',
